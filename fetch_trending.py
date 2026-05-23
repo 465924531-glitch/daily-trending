@@ -91,30 +91,76 @@ def push_to_pushplus(token, content, title="GitHub 每日热门"):
             result = json.loads(resp.read().decode("utf-8"))
             return result.get("code") == 200
     except Exception as e:
-        print(f"Push failed: {e}")
+        print(f"PushPlus failed: {e}")
+        return False
+
+def push_to_email(smtp_host, smtp_port, smtp_user, smtp_pass, to_addr, subject, html_content):
+    """Send email via SMTP."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.header import Header
+    import base64
+    
+    msg = MIMEText(html_content, "html", "utf-8")
+    msg["Subject"] = Header(subject, "utf-8")
+    msg["From"] = smtp_user
+    msg["To"] = to_addr
+    
+    try:
+        server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15)
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, [to_addr], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Email failed: {e}")
         return False
 
 if __name__ == "__main__":
     import os
-    token = os.environ.get("PUSHPLUS_TOKEN", "")
-    if not token:
-        print("❌ PUSHPLUS_TOKEN 未设置")
-        exit(1)
     
     repos = fetch_trending()
     if isinstance(repos, str):
-        push_to_pushplus(token, repos)
+        print(f"❌ 抓取失败: {repos}")
         exit(1)
     
     if not repos:
-        push_to_pushplus(token, "<p>今日暂无热门项目数据</p>")
-        exit(0)
-    
-    msg = format_message(repos)
-    success = push_to_pushplus(token, msg)
-    
-    if success:
-        print(f"✅ 推送成功，共 {len(repos)} 个项目")
+        msg = "<p>今日暂无热门项目数据</p>"
     else:
-        print("❌ 推送失败")
+        msg = format_message(repos)
+    
+    title = f"GitHub 每日热门 ({len(repos)}个项目)"
+    all_ok = True
+    
+    # 1. PushPlus 推送微信
+    pp_token = os.environ.get("PUSHPLUS_TOKEN", "")
+    if pp_token:
+        pp_ok = push_to_pushplus(pp_token, msg, title)
+        print(f"{'✅' if pp_ok else '❌'} PushPlus微信推送: {'成功' if pp_ok else '失败'}")
+        if not pp_ok:
+            all_ok = False
+    else:
+        print("⏭️ PushPlus 未配置，跳过")
+    
+    # 2. QQ邮箱推送（给小号）
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    smtp_port = os.environ.get("SMTP_PORT", "465")
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    email_to = os.environ.get("EMAIL_TO", "")
+    
+    if smtp_host and smtp_user and smtp_pass and email_to:
+        email_ok = push_to_email(
+            smtp_host, int(smtp_port), smtp_user, smtp_pass, email_to,
+            title, msg
+        )
+        print(f"{'✅' if email_ok else '❌'} 邮箱推送: {'成功' if email_ok else '失败'}")
+        if not email_ok:
+            all_ok = False
+    else:
+        print("⏭️ 邮箱未配置，跳过")
+    
+    if all_ok:
+        print(f"🎉 全部推送完成，共 {len(repos)} 个项目")
+    else:
         exit(1)
