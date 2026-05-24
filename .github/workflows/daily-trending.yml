@@ -19,10 +19,10 @@ jobs:
           python-version: '3.11'
       - name: run
         env:
-          PUSHPULUS_TOKEN: ${{ secrets.PUSHPULUS_TOKEN }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPULUS_TOKEN }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-        run: python fetch-trending.py
+        run: python fetch_trending.py
